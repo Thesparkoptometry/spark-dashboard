@@ -5,7 +5,7 @@ import {
   DEFAULT_ROSTER, DOCTOR_TYPE_LABELS, BONUS_ELIGIBLE,
   GROSS_BONUS, MYOPIA_BONUS, LASIK_BONUS,
   calcDayBonus, computeDoctorStats,
-  loadRoster, saveRosterDoctor,
+  loadRoster, saveRosterDoctor, deleteRosterDoctor,
   loadDoctorProfiles, saveDoctorProfile,
   loadPayments, savePayment, deletePayment,
   parseSquarePayrollXLSX, matchSquareName,
@@ -1162,10 +1162,11 @@ function LabeledBarChart({ data, color = '#2E7D8C', fmt = v => v }) {
   );
 }
 
-// ── Add Doctor Modal ──────────────────────────────────────────────────────
-function AddDoctorModal({ onClose, onAdd }) {
+// ── Add / Edit Doctor Modal ───────────────────────────────────────────────
+function AddDoctorModal({ onClose, onAdd, editDoctor }) {
   const LOCS = ['SC','F','WC','SV'];
-  const [form, setForm] = useState({
+  const isEdit = !!editDoctor;
+  const [form, setForm] = useState(editDoctor ? { ...editDoctor } : {
     name: '', id: '', type: 'ppt', payType: 'perdiem', locations: [], archived: false
   });
   const [error, setError] = useState('');
@@ -1183,7 +1184,7 @@ function AddDoctorModal({ onClose, onAdd }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div style={{ background: 'white', borderRadius: 16, maxWidth: 440, width: '100%', padding: 28, boxShadow: '0 8px 40px rgba(0,0,0,0.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#1B3A5C' }}>Add Doctor</h2>
+          <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 20, color: '#1B3A5C' }}>{isEdit ? 'Edit Doctor' : 'Add Doctor'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94A3B8' }}>✕</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1193,8 +1194,8 @@ function AddDoctorModal({ onClose, onAdd }) {
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, fontWeight: 600, color: '#64748B' }}>
             EXCEL NAME — must match exactly how it appears in your spreadsheet
-            <input value={form.id} onChange={e => setForm(f => ({...f, id: e.target.value}))} style={inp} placeholder="Smith" />
-            <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 400 }}>e.g. if the Excel shows "Smith" in the Doctor column, enter Smith</span>
+            <input value={form.id} onChange={e => setForm(f => ({...f, id: e.target.value}))} style={{ ...inp, ...(isEdit ? { background: '#F1F5F9', color: '#94A3B8', cursor: 'not-allowed' } : {}) }} placeholder="Smith" disabled={isEdit} />
+            <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 400 }}>{isEdit ? "Excel name can't be changed — to fix it, archive this doctor, delete them, and re-add with the correct name" : 'e.g. if the Excel shows "Smith" in the Doctor column, enter Smith'}</span>
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11, fontWeight: 600, color: '#64748B' }}>
             TYPE
@@ -1228,7 +1229,7 @@ function AddDoctorModal({ onClose, onAdd }) {
           {error && <p style={{ color: '#DC2626', fontSize: 12 }}>{error}</p>}
         </div>
         <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
-          <button onClick={submit} style={{ background: '#1B3A5C', color: 'white', border: 'none', borderRadius: 7, padding: '9px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, flex: 1 }}>Add Doctor</button>
+          <button onClick={submit} style={{ background: '#1B3A5C', color: 'white', border: 'none', borderRadius: 7, padding: '9px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, flex: 1 }}>{isEdit ? 'Save Changes' : 'Add Doctor'}</button>
           <button onClick={onClose} style={{ background: '#F1F5F9', color: '#475569', border: 'none', borderRadius: 7, padding: '9px 16px', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
         </div>
       </div>
@@ -1497,6 +1498,7 @@ export default function DoctorsView({ allPatients, filters, onSquareImported, sh
     else { setSortCol(col); setSortDir('asc'); }
   };
   const [showAddDoctor, setShowAddDoctor] = useState(false);
+  const [editingDoctor, setEditingDoctor] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const year = filters?.year || '2026';
 
@@ -1537,6 +1539,18 @@ export default function DoctorsView({ allPatients, filters, onSquareImported, sh
     setRoster(updated);
     await saveRosterDoctor(newDoc);
     setShowAddDoctor(false);
+  };
+
+  const handleEditDoctor = async (edited) => {
+    const updated = roster.map(d => d.id === edited.id ? edited : d);
+    setRoster(updated);
+    await saveRosterDoctor(edited);
+    setEditingDoctor(null);
+  };
+
+  const handleDeleteDoctor = async (doctorId) => {
+    setRoster(roster.filter(d => d.id !== doctorId));
+    await deleteRosterDoctor(doctorId);
   };
 
   const handleArchiveDoctor = async (doctorId) => {
@@ -1859,6 +1873,10 @@ export default function DoctorsView({ allPatients, filters, onSquareImported, sh
                             style={{ background: '#F1F5F9', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, color: '#475569', fontWeight: 600 }}>
                             View →
                           </button>
+                          <button onClick={() => setEditingDoctor(r)}
+                            style={{ background: '#EFF6FF', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, color: '#1B3A5C', fontWeight: 600 }}>
+                            Edit
+                          </button>
                           <button onClick={() => { if(window.confirm('Archive ' + r.name + '?')) handleArchiveDoctor(r.id); }}
                             style={{ background: '#FEE2E2', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 11, color: '#DC2626' }}>
                             Archive
@@ -1890,6 +1908,10 @@ export default function DoctorsView({ allPatients, filters, onSquareImported, sh
                       style={{ background: '#D1FAE5', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 12, color: '#065F46', fontWeight: 600 }}>
                       Restore
                     </button>
+                    <button onClick={() => { if(window.confirm('Permanently delete ' + d.name + ' (' + d.id + ')? This cannot be undone. Their payment history in Doctor Profiles will not be affected.')) handleDeleteDoctor(d.id); }}
+                      style={{ background: '#FEE2E2', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: 'pointer', fontSize: 12, color: '#DC2626', fontWeight: 600 }}>
+                      Delete
+                    </button>
                   </div>
                 ))}
               </div>
@@ -1916,6 +1938,7 @@ export default function DoctorsView({ allPatients, filters, onSquareImported, sh
         )}
 
         {showAddDoctor && <AddDoctorModal onClose={() => setShowAddDoctor(false)} onAdd={handleAddDoctor} />}
+        {editingDoctor && <AddDoctorModal editDoctor={editingDoctor} onClose={() => setEditingDoctor(null)} onAdd={handleEditDoctor} />}
         {showSquareImport && (
           <SquareImportModal
             onClose={() => setShowSquareImport(false)}
