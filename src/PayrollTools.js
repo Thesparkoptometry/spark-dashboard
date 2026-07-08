@@ -76,6 +76,7 @@ export function RunPayrollTab({ activeRoster, profiles, allPatients, allPayments
         if (d.id === 'Cheng') { initialsMap['KC'] = 'Cheng'; }
         if (d.id === 'So') { initialsMap['KS'] = 'So'; }
         if (d.id === 'Duong') { initialsMap['AD'] = 'Duong'; }
+        if (d.id === 'Miranda') { initialsMap['CM'] = 'Miranda'; }
       }
 
       // Use spark-schedule-ocr worker (same as hours tool) - already working
@@ -94,6 +95,11 @@ export function RunPayrollTab({ activeRoster, profiles, allPatients, allPayments
       const pStart = new Date(periodStart + 'T12:00:00');
       const pEnd = new Date(periodEnd + 'T12:00:00');
       const assignments = [];
+      const unmatched = new Set();
+      const cleanCell = (raw) => raw
+        .replace(/\s*\([\d:.\-]+.*?\)/g, '')            // strip times like (10-3) or (9:30-5:30)
+        .replace(/\s+[\d]+[:\-][\d:.\-]+.*$/, '')       // strip trailing bare times
+        .trim();
       for (const week of schedData.weeks) {
         for (let di = 0; di < 7; di++) {
           const dateStr = week.dates[di];
@@ -101,7 +107,7 @@ export function RunPayrollTab({ activeRoster, profiles, allPatients, allPayments
           const d = new Date(dateStr + 'T12:00:00');
           if (d < pStart || d > pEnd) continue;
           for (const loc of ['SC','SV','F','WC']) {
-            const cell = (week[loc]?.[di] || '').trim();
+            const cell = cleanCell((week[loc]?.[di] || '').trim());
             if (!cell || cell === '' || cell === 'BLOCKED') continue;
             // Handle split days like "LF/CY" - already separated by spark-schedule-ocr as single initials
             const isSplit = cell.includes('/');
@@ -111,14 +117,19 @@ export function RunPayrollTab({ activeRoster, profiles, allPatients, allPayments
                 const trimmed = initials.trim();
                 if (!trimmed) continue;
                 const doctorId = initialsMap[trimmed] || null;
+                if (!doctorId) unmatched.add(trimmed);
                 assignments.push({ date: dateStr, location: loc, initials: trimmed, doctorId, isSplit: true, splitWith: parts.filter(p=>p.trim()!==trimmed).join('/') });
               }
             } else {
               const doctorId = initialsMap[cell] || null;
               if (doctorId) assignments.push({ date: dateStr, location: loc, initials: cell, doctorId, isSplit: false, splitWith: null });
+              else unmatched.add(cell);
             }
           }
         }
+      }
+      if (unmatched.size > 0) {
+        alert('Heads up — these initials on the schedule don\'t match any doctor in your roster and were skipped: ' + [...unmatched].join(', ') + '. Check the doctor\'s initials or add them in Doctor Management.');
       }
 
       // Group by doctor
