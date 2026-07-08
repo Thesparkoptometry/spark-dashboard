@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { parseExcelFile } from './parseExcel';
-import { loadFirestorePatients, loadActiveDoctors } from './parseFirestore';
+import { loadFirestorePatients } from './parseFirestore';
 import ProductionView from './ProductionView';
 import DoctorsView from './DoctorsView';
 import ExpensesView from './ExpensesView';
@@ -76,8 +76,6 @@ export default function Dashboard({ user, onSignOut }) {
   const [liveUpdatedAt, setLiveUpdatedAt] = useState(null);
   const [liveData, setLiveData] = useState(null);
   const [excelData, setExcelData] = useState(null);
-  const [activeDoctors, setActiveDoctors] = useState(null); // null = all
-  const [showFormerDoctors, setShowFormerDoctors] = useState(false);
   const fileRef = useRef();
 
   // Load persisted data on mount
@@ -94,12 +92,8 @@ export default function Dashboard({ user, onSignOut }) {
 
       // Load live Firestore billing data
       try {
-        const [patients, activeDocs] = await Promise.all([
-          loadFirestorePatients(),
-          loadActiveDoctors(),
-        ]);
+        const patients = await loadFirestorePatients();
         setLiveData(patients);
-        setActiveDoctors(activeDocs);
         setLiveUpdatedAt(new Date().toISOString());
         // Default to live data if available
         if (patients.length > 0) {
@@ -298,18 +292,6 @@ export default function Dashboard({ user, onSignOut }) {
           {/* Upload button */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
 
-            {/* Former doctors toggle — only show if active doctors list is loaded */}
-            {activeDoctors && (
-              <button onClick={() => setShowFormerDoctors(v => !v)} style={{
-                padding: '5px 12px', borderRadius: 7, border: '1px solid #E2E8F0',
-                background: showFormerDoctors ? '#FEF3C7' : '#F1F5F9',
-                color: showFormerDoctors ? '#92400E' : '#64748B',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}>
-                {showFormerDoctors ? '👥 All doctors' : '👥 Active only'}
-              </button>
-            )}
-
             {/* Source toggle */}
             <div style={{ display: 'flex', background: '#F1F5F9', borderRadius: 8, padding: 3, gap: 2 }}>
               <button onClick={() => handleSourceToggle('live')}
@@ -427,22 +409,19 @@ export default function Dashboard({ user, onSignOut }) {
           {/* Production view */}
           {!loading && !initialLoading && data && page === 'production' && (
             <ProductionView
-              allPatients={(!showFormerDoctors && activeDoctors) ? data.filter(p => activeDoctors.includes(p.doctor)) : data}
+              allPatients={data}
               filters={filters}
               onFilterChange={setFilters}
               onShowEmployeeReport={(doctorId) => setEmployeeReportFor(doctorId)}
               allPayments={sharedPayments}
               profiles={sharedProfiles}
-              activeDoctors={activeDoctors}
-              showFormerDoctors={showFormerDoctors}
-              onToggleFormerDoctors={() => setShowFormerDoctors(v => !v)}
             />
           )}
 
           {/* Doctors view */}
           {!loading && !initialLoading && page === 'doctors' && (
             <DoctorsView
-              allPatients={(!showFormerDoctors && activeDoctors) ? (data||[]).filter(p => activeDoctors.includes(p.doctor)) : (data||[])}
+              allPatients={data || []}
               filters={filters}
               showEmployeeReportFor={null}
               onClearEmployeeReport={() => {}}
