@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/spark-dashboard/static/css/main.da4a3de5.css",
-    "main.js": "/spark-dashboard/static/js/main.c46ac49e.js",
+    "main.js": "/spark-dashboard/static/js/main.c69589e3.js",
     "index.html": "/spark-dashboard/index.html",
     "main.da4a3de5.css.map": "/spark-dashboard/static/css/main.da4a3de5.css.map",
-    "main.c46ac49e.js.map": "/spark-dashboard/static/js/main.c46ac49e.js.map"
+    "main.c69589e3.js.map": "/spark-dashboard/static/js/main.c69589e3.js.map"
   },
   "entrypoints": [
     "static/css/main.da4a3de5.css",
-    "static/js/main.c46ac49e.js"
+    "static/js/main.c69589e3.js"
   ]
 }
